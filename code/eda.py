@@ -2,44 +2,39 @@ import pandas as pd
 from argparse import ArgumentParser
 
 
-def load_data_foursquare():
-    df_checkins = pd.read_csv(
-        "data/foursquare/checkins.txt", sep="\t", header=None
-    )
-    df_friends = pd.read_csv(
-        "data/foursquare/friends.txt", sep="\t", header=None
-    )
+def load_data(dataset, compress_same_ul=False):
+    if dataset == "gowalla-small":
+        df_checkins = pd.read_csv(
+            "data/gowalla-small/checkins.txt", sep="\t", header=None)
+        df_friends = pd.read_csv(
+            "data/gowalla-small/friends.txt", sep="\t", header=None)
 
-    df_checkins.columns = ["user_id", "location_id", "utc_time", "time_zone"]
+        df_checkins.columns = [
+            "user_id", "checkin_time", "latitude", "longitude", "location_id"]
+        df_friends.columns = ["user_id", "friend_id"]
+
+    elif dataset == "gowalla":
+        raise NotImplementedError("Still have to implement this")
+    elif dataset == "foursquare":
+        df_checkins = pd.read_csv(
+            "data/foursquare/checkins.txt", sep="\t", header=None)
+        df_friends = pd.read_csv(
+            "data/foursquare/friends.txt", sep="\t", header=None)
+
+        df_checkins.columns = [
+            "user_id", "location_id", "utc_time", "time_zone"]
+        df_friends.columns = ["user_id", "friend_id"]
+    else:
+        raise ValueError("Invalid dataset name")
+
     df_checkins = df_checkins[["user_id", "location_id"]]
     df_checkins = df_checkins.sort_values(by=["user_id"])
+    if compress_same_ul:
+        df_checkins['frequency'] = 1
+        df_checkins = df_checkins.groupby(
+            ['user_id', 'location_id']).count().reset_index()
 
-    df_friends.columns = ["user_id", "friend_id"]
     df_friends = df_friends.sort_values(by=["user_id"])
-
-    return df_checkins, df_friends
-
-
-def load_data_gowalla():
-    # Load data
-    df_checkins = pd.read_csv(
-        "data/gowalla/checkins.txt", sep="\t", header=None
-    )
-    df_friends = pd.read_csv("data/gowalla/friends.txt", sep="\t", header=None)
-
-    df_checkins.columns = [
-        "user_id",
-        "checkin_time",
-        "latitude",
-        "longitude",
-        "location_id",
-    ]
-    df_checkins = df_checkins[["user_id", "location_id"]]
-    df_checkins = df_checkins.sort_values(by=["user_id"])
-
-    df_friends.columns = ["user_id", "friend_id"]
-    df_friends = df_friends.sort_values(by=["user_id"])
-
     return df_checkins, df_friends
 
 
@@ -112,14 +107,9 @@ def stats_location(df_checkins):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="gowalla")
+    parser.add_argument("--dataset", "-d", type=str, default="gowalla-small")
     args = parser.parse_args()
-    if args.dataset == "gowalla":
-        df_checkins, df_friends = load_data_gowalla()
-    elif args.dataset == "foursquare":
-        df_checkins, df_friends = load_data_foursquare()
-    else:
-        raise ValueError("Dataset not supported")
+    df_checkins, df_friends = load_data(args.dataset)
     stats_dataset(df_checkins, df_friends)
     print()
     stats_user(df_checkins, df_friends)
