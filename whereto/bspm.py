@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import dok_matrix, spdiags, linalg
+from scipy.sparse import dok_matrix, spdiags, save_npz, load_npz, linalg
 
 from .load_data import load_data
 
@@ -66,7 +66,31 @@ def adj_matrix(adj_list, n_users, n_locations):
     return adj_matrix
 
 
-def calc_P(adj_matrix, n_users, n_locations, top_k):
+def load_adj_matrix(dataset):
+    """loads an adjacency matrix from a file if it exists, \
+        otherwise creates it from scratch
+
+    Args:
+        dataset (str): name of dataset
+    """
+    try:
+        mtrx = load_npz(f"data/{dataset}/adj_matrix.npz")
+        n_users, n_locations = mtrx.shape
+        mtrx = (mtrx)
+    except FileNotFoundError:
+        # print("Could not load adjacency matrix from file.")
+        # print("Creating adjacency matrix from scratch.")
+        df_checkins, _ = load_data(dataset, compress_same_ul=True)
+        df_checkins, n_users, n_locations = remap_ids(df_checkins)
+        lst = adj_list(df_checkins)
+        mtrx = adj_matrix(lst, n_users, n_locations)
+        mtrx = mtrx.tocsr()
+        save_npz(f"data/{dataset}/adj_matrix.npz", mtrx)
+
+    return mtrx, n_users, n_locations
+
+
+def calc_all_things(adj_matrix, n_users, n_locations, top_k):
     """calculates P from the adjacency matrix
 
     Args:
@@ -89,14 +113,6 @@ def calc_P(adj_matrix, n_users, n_locations, top_k):
     R_prime = U_inv @ adj_matrix @ V_inv
 
     # calculating U_prime (top_k singular vectors)
-    U_prime = linalg.svds(R_prime, k=top_k)
+    _, _, Ut = linalg.svds(R_prime, k=top_k)
 
-    return R_prime.T @ R_prime, R_prime, V, V_inv, U_prime
-
-
-if __name__ == "__main__":
-    df_checkins, _ = load_data("gowalla-small", compress_same_ul=True)
-    df_checkins, n_users, n_locations = remap_ids(df_checkins)
-    adj_list = adj_list(df_checkins)
-    adj_matrix = adj_matrix(adj_list, n_users, n_locations)
-    P = calc_P(adj_matrix, n_users, n_locations)
+    return R_prime.T @ R_prime, R_prime, V, V_inv, Ut

@@ -50,7 +50,8 @@ def test_adj_matrix():
     ]
 
 
-def test_calc_P():
+def test_calc_all_things():
+    top_k = 2
     adj_matrix = bspm.adj_matrix(
         {
             0: [0, 1, 2],
@@ -61,7 +62,7 @@ def test_calc_P():
         4,
         3,
     )
-    P, R_prime, V, V_inv, U_prime = bspm.calc_P(adj_matrix, 4, 3, 1)
+    P, R_prime, V, V_inv, _ = bspm.calc_all_things(adj_matrix, 4, 3, top_k)
     exp_P = [
         [11/18, 5/18, sqrt(1/27)],
         [5/18, 11/18, sqrt(1/27)],
@@ -83,6 +84,7 @@ def test_calc_P():
         [0, sqrt(1/3), 0],
         [0, 0, 1],
     ]
+
     np.testing.assert_array_almost_equal(P.todense().tolist(), exp_P)
     np.testing.assert_array_almost_equal(
         R_prime.todense().tolist(), exp_R_prime)
