@@ -116,3 +116,5 @@ def calc_all_things(adj_matrix, n_users, n_locations, top_k):
     _, _, Ut = linalg.svds(R_prime, k=top_k)
 
     return R_prime.T @ R_prime, R_prime, V, V_inv, Ut
+
+
