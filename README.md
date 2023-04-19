@@ -1,2 +1,2 @@
 # cse6240
-a location recommendation system using the gowalla and foursquare dataset
+a location recommendation system which doesn't work but uses the gowalla and foursquare dataset

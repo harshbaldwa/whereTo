@@ -1,120 +1,208 @@
 import numpy as np
-from scipy.sparse import dok_matrix, spdiags, save_npz, load_npz, linalg
+from scipy.sparse import dok_matrix, spdiags, save_npz, load_npz, csc_matrix
+from sparsesvd import sparsesvd
+from torchdiffeq import odeint
+import torch
+import pickle
 
 from .load_data import load_data
 
 
-def remap_ids(df_checkins):
-    """remaps user ids and locations ids so that they are contiguous integers
+class BSPM:
+    def __init__(self, dataset, top_k):
+        self.dataset = dataset
+        self.top_k = top_k
+        self.n_users = 0
+        self.n_locations = 0
+        self.adj_mtx = None
 
-    Args:
-        df_checkins (dataframe): dataframe containing \
-            checkins [user_id, location_id]
-    """
-    # get unique user ids and locations ids
-    users = df_checkins["user_id"].unique()
-    locations = df_checkins["location_id"].unique()
+        self.lst = None
+        self.train_lst = None
+        self.P = None
+        self.V = None
+        self.V_inv = None
+        self.Ut = None
+        self.idl = 0.2
 
-    # create a mapping from old ids to new ids
-    user_map = dict(zip(users, range(len(users))))
-    location_map = dict(zip(locations, range(len(locations))))
+        self.results_batch = {}
 
-    # remap user ids and location ids
-    df_checkins["user_id"] = df_checkins["user_id"].apply(
-        lambda x: user_map[x])
-    df_checkins["location_id"] = df_checkins["location_id"].apply(
-        lambda x: location_map[x])
+    def load_adj_matrix(self):
+        """loads an adjacency matrix from a file if it exists, \
+            otherwise creates it from scratch
 
-    return df_checkins, len(users), len(locations)
+        Args:
+            dataset (str): name of dataset
+        """
+        try:
+            self.adj_mtx = load_npz(f"data/{self.dataset}/adj_matrix.npz")
+            with open(f"data/{self.dataset}/adj_list.pkl", "rb") as f:
+                self.lst = pickle.load(f)
+            with open(f"data/{self.dataset}/train_list.pkl", "rb") as f:
+                self.train_lst = pickle.load(f)
+            self.n_users, self.n_locations = self.adj_mtx.shape
+            self.P = load_npz(f"data/{self.dataset}/P.npz")
+            self.V = load_npz(f"data/{self.dataset}/V.npz")
+            self.V_inv = load_npz(f"data/{self.dataset}/V_inv.npz")
+            self.Ut = load_npz(f"data/{self.dataset}/Ut_{self.top_k}.npz")
+        except FileNotFoundError:
+            df_checkins, _ = load_data(self.dataset, compress_same_ul=True)
+            df_checkins, self.n_users, self.n_locations = self.remap_ids(df_checkins)
+            self.adj_list(df_checkins)
+            self.train_split()
+            # save self.lst to file
+            with open(f"data/{self.dataset}/adj_list.pkl", "wb") as f:
+                pickle.dump(self.lst, f)
+            with open(f"data/{self.dataset}/train_list.pkl", "wb") as f:
+                pickle.dump(self.train_lst, f)
+            mtrx = self.adj_matrix()
+            self.adj_mtx = mtrx.tocsc()
+            save_npz(f"data/{self.dataset}/adj_matrix.npz", self.adj_mtx)
+            self.calc_all_things()
 
+    def remap_ids(self, df_checkins):
+        # get unique user ids and locations ids
+        users = df_checkins["user_id"].unique()
+        locations = df_checkins["location_id"].unique()
 
-def adj_list(df_checkins):
-    """converts a dataframe of checkins to an adjacency list
+        # create a mapping from old ids to new ids
+        user_map = dict(zip(users, range(len(users))))
+        location_map = dict(zip(locations, range(len(locations))))
 
-    Args:
-        df_checkins (dataframe): dataframe containing \
-            checkins [user_id, location_id]
-    """
-    # get unique user ids and locations ids
-    users = df_checkins["user_id"].unique()
+        # remap user ids and location ids
+        df_checkins["user_id"] = df_checkins["user_id"].apply(
+            lambda x: user_map[x])
+        df_checkins["location_id"] = df_checkins["location_id"].apply(
+            lambda x: location_map[x])
 
-    # create empty adjacency list
-    adj_list = {user: [] for user in users}
+        return df_checkins, len(users), len(locations)
 
-    # populate adjacency list
-    for user, location in zip(df_checkins["user_id"],
-                              df_checkins["location_id"]):
-        adj_list[user].append(location)
+    def adj_list(self, df_checkins):
+        # get unique user ids and locations ids
+        users = df_checkins["user_id"].unique()
 
-    return adj_list
+        # create empty adjacency list
+        adj_list = {user: [] for user in users}
 
+        # populate adjacency list
+        for user, location in zip(df_checkins["user_id"],
+                                  df_checkins["location_id"]):
+            adj_list[user].append(location)
 
-def adj_matrix(adj_list, n_users, n_locations):
-    """converts an adjacency list to an adjacency matrix
+        self.lst = adj_list
 
-    Args:
-        adj_list (dict): adjacency list
-    """
-    # create empty adjacency matrix
-    adj_matrix = dok_matrix((n_users, n_locations), dtype=np.float32)
+    def train_split(self, train_size=0.7, seed=42):
+        """splits the adjacency list into train set
 
-    # populate adjacency matrix
-    for user in adj_list:
-        for location in adj_list[user]:
-            adj_matrix[user, location] = 1
+        Args:
+            adj_list (dict): adjacency list
+            train_size (float, optional): proportion of data to use for \
+                training. Defaults to 0.7.
+            seed (int, optional): random seed. Defaults to 42.
 
-    return adj_matrix
+        Returns:
+            dict: train set
+        """
+        # set random seed
+        np.random.seed(seed)
 
+        # create empty train and test sets
+        train_set = {user: [] for user in self.lst}
 
-def load_adj_matrix(dataset):
-    """loads an adjacency matrix from a file if it exists, \
-        otherwise creates it from scratch
+        # populate train and test sets
+        for user in self.lst:
+            n_locations = len(self.lst[user])
+            # if n_locations == 20:
+            #     print(user)
 
-    Args:
-        dataset (str): name of dataset
-    """
-    try:
-        mtrx = load_npz(f"data/{dataset}/adj_matrix.npz")
-        n_users, n_locations = mtrx.shape
-        mtrx = (mtrx)
-    except FileNotFoundError:
-        # print("Could not load adjacency matrix from file.")
-        # print("Creating adjacency matrix from scratch.")
-        df_checkins, _ = load_data(dataset, compress_same_ul=True)
-        df_checkins, n_users, n_locations = remap_ids(df_checkins)
-        lst = adj_list(df_checkins)
-        mtrx = adj_matrix(lst, n_users, n_locations)
-        mtrx = mtrx.tocsr()
-        save_npz(f"data/{dataset}/adj_matrix.npz", mtrx)
+            if n_locations == 0:
+                continue
+            n_train = int(np.ceil(n_locations * train_size))
+            train_set[user] = np.random.choice(self.lst[user], n_train,
+                                               replace=False)
 
-    return mtrx, n_users, n_locations
+        self.train_lst = train_set
 
+    def adj_matrix(self):
+        # create empty adjacency matrix
+        adj_matrix = dok_matrix((self.n_users, self.n_locations), dtype=np.float32)
 
-def calc_all_things(adj_matrix, n_users, n_locations, top_k):
-    """calculates P from the adjacency matrix
+        # populate adjacency matrix
+        for user in self.train_lst:
+            for location in self.train_lst[user]:
+                adj_matrix[user, location] = 1
 
-    Args:
-        adj_matrix (scipy.sparse.dok_matrix): adjacency matrix
-    """
-    # row and column sums
-    u_diag = adj_matrix.sum(axis=1).flatten()
-    v_diag = adj_matrix.sum(axis=0).flatten()
+        return adj_matrix
 
-    # inverse of row and column sums
-    u_inv = np.power(u_diag, -0.5)
-    v_inv = np.power(v_diag, -0.5)
+    def calc_all_things(self):
+        """calculates P from the adjacency matrix
 
-    # creating sparse diagonal matrices
-    U_inv = spdiags(u_inv, 0, n_users, n_users)
-    V = spdiags(v_diag, 0, n_locations, n_locations)
-    V_inv = spdiags(v_inv, 0, n_locations, n_locations)
+        Args:
+            adj_matrix (scipy.sparse.dok_matrix): adjacency matrix
+        """
+        # row and column sums
+        u_diag = self.adj_mtx.sum(axis=1).flatten()
+        v_diag = self.adj_mtx.sum(axis=0).flatten()
+        print("diag done")
+        # inverse of row and column sums
+        u_inv = np.power(u_diag, -0.5)
+        u_inv[np.isinf(u_inv)] = 0
+        v_inv = np.power(v_diag, -0.5)
+        v_inv[np.isinf(v_inv)] = 0
+        print("inv done")
+        # creating sparse diagonal matrices
+        U_inv = spdiags(u_inv, 0, self.n_users, self.n_users)
+        self.V = spdiags(v_diag, 0, self.n_locations, self.n_locations)
+        self.V_inv = spdiags(v_inv, 0, self.n_locations, self.n_locations)
+        print("diag mtrx done")
+        # calculating R_prime
+        R_prime = U_inv @ self.adj_mtx @ self.V_inv
+        self.P = R_prime.T @ R_prime
+        print("R_prime done")
+        # calculating U_prime (top_k singular vectors)
+        R_prime = R_prime.tocsc()
+        # _, _, self.Ut = linalg.svds(R_prime, k=self.top_k)
+        _, _, self.Ut = sparsesvd(R_prime, self.top_k)
+        self.Ut = csc_matrix(self.Ut)
+        print("done")
+        save_npz(f"data/{self.dataset}/P.npz", self.P)
+        save_npz(f"data/{self.dataset}/V.npz", self.V)
+        save_npz(f"data/{self.dataset}/V_inv.npz", self.V_inv)
+        save_npz(f"data/{self.dataset}/Ut_{self.top_k}.npz", self.Ut)
 
-    # calculating R_prime
-    R_prime = U_inv @ adj_matrix @ V_inv
+    def blur_function(self, t, R):
+        out = R.numpy() @ self.P
+        out -= R.numpy()
+        return torch.Tensor(out)
 
-    # calculating U_prime (top_k singular vectors)
-    _, _, Ut = linalg.svds(R_prime, k=top_k)
+    def idl_function(self, t, R):
+        out = R.numpy() @ self.V_inv @ self.Ut.T @ self.Ut @ self.V
+        out -= R.numpy()
+        return torch.Tensor(out)
 
-    return R_prime.T @ R_prime, R_prime, V, V_inv, Ut
+    def sharp_function(self, t, R):
+        out = - R.numpy() @ self.P
+        return torch.Tensor(out)
 
+    def train(self, batch_test):
 
+        self.results_batch = {user: [] for user in batch_test}
+
+        R = torch.Tensor(np.array(self.adj_mtx[batch_test].todense()))
+
+        blurred_out = odeint(self.blur_function, R,
+                             torch.linspace(0, 1, 2).float(),
+                             method="euler")
+
+        idl_out = odeint(self.idl_function, R,
+                         torch.linspace(0, 1, 2).float(),
+                         method="euler")
+
+        sharp_out = odeint(
+            self.sharp_function, blurred_out[-1] + self.idl*idl_out[-1],
+            torch.linspace(0, 2.5, 2).float(), method="rk4")
+
+        for i, user in enumerate(batch_test):
+            self.results_batch[user] = sharp_out[-1][i].numpy().argsort()[::-1]
+
+    def predict(self, user, k=20):
+        return self.results_batch[user][:k]
