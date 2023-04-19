@@ -8,15 +8,23 @@ def recall_at_k(model, batch_test, k):
     :param k: The number of items to consider.
     :return: The recall at k metric.
     """
-    hits = 0
-    total = 0
+    # hits = 0
+    # total = 0
+    rec = 0
     for i, user in enumerate(batch_test):
         actual_results = model.lst[user]
-
-        algo_results = model.predict(user, k)
+        train_results = model.train_lst[user]
+        actual_results = np.setdiff1d(actual_results, train_results)
+        if len(actual_results) == 0:
+            continue
+        algo_results = model.predict(user, len(actual_results))
+        algo_results = np.setdiff1d(algo_results, train_results)
         numerator = np.intersect1d(algo_results, actual_results)
+        rec += len(numerator) / len(actual_results)
+        # if len(numerator) > 0:
+        #     print(f"User: {i}")
+        #     print(f"Intersection: {numerator}")
+        # hits += len(numerator)
+        # total += len(actual_results)
 
-        hits += len(numerator)
-        total += len(actual_results)
-
-    return hits / total
+    return rec / len(batch_test)

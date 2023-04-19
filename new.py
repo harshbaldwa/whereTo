@@ -6,12 +6,14 @@ from whereto.metrics import recall_at_k
 
 s = time.time()
 dataset = "gowalla-small"
-bspm = BSPM(dataset, top_k=100)
+bspm = BSPM(dataset, top_k=200)
 bspm.load_adj_matrix()
-rng = np.random.default_rng()
-batch_test = sorted(rng.choice(bspm.n_users, size=20, replace=False))
+# rng = np.random.default_rng(42)
+# batch_test = sorted(rng.choice(bspm.n_users, size=20, replace=False))
+batch_test = np.arange(20)
 bspm.train(batch_test)
-
+e = time.time()
+print(f"Time: {e-s}")
 recall = recall_at_k(bspm, batch_test, 20)
 print(f"Recall: {recall}")
 

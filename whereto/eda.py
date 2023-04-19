@@ -1,14 +1,15 @@
-def stats_dataset(df_checkins, df_friends, verbose=False):
+def stats_dataset(df_checkins, verbose=False):
     n_users = df_checkins["user_id"].nunique()
     n_checkins = df_checkins.shape[0]
     n_locations = df_checkins["location_id"].nunique()
+    n_max_checkins = df_checkins["frequency"].max()
     if verbose:
         print("Number of users: ", n_users)
         print("Number of locations: ", n_locations)
-        print("Number of checkins: ", n_checkins)
-        print("Number of friendships: ", df_friends.shape[0] // 2)
+        print("Number of unique checkins: ", n_checkins)
+        print("Max checkins by any user: ", n_max_checkins)
         print()
-    return n_users, n_checkins, n_locations
+    return n_users, n_checkins, n_locations, n_max_checkins
 
 
 def stats_user(df_checkins, df_friends, verbose=False):

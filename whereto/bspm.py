@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import dok_matrix, spdiags, save_npz, load_npz, csc_matrix
+from scipy.sparse import dok_matrix, diags, save_npz, load_npz, csc_matrix
 from sparsesvd import sparsesvd
 from torchdiffeq import odeint
 import torch
@@ -140,26 +140,29 @@ class BSPM:
             adj_matrix (scipy.sparse.dok_matrix): adjacency matrix
         """
         # row and column sums
-        u_diag = self.adj_mtx.sum(axis=1).flatten()
-        v_diag = self.adj_mtx.sum(axis=0).flatten()
+        u_diag = np.array(self.adj_mtx.sum(axis=1))
+        v_diag = np.array(self.adj_mtx.sum(axis=0))
         print("diag done")
         # inverse of row and column sums
-        u_inv = np.power(u_diag, -0.5)
+        u_inv = np.power(u_diag, -0.5).flatten()
         u_inv[np.isinf(u_inv)] = 0
-        v_inv = np.power(v_diag, -0.5)
+        v_inv = np.power(v_diag, -0.5).flatten()
         v_inv[np.isinf(v_inv)] = 0
         print("inv done")
         # creating sparse diagonal matrices
-        U_inv = spdiags(u_inv, 0, self.n_users, self.n_users)
-        self.V = spdiags(v_diag, 0, self.n_locations, self.n_locations)
-        self.V_inv = spdiags(v_inv, 0, self.n_locations, self.n_locations)
+        U_inv = diags(u_inv)
+        v_diag = np.power(v_inv, -1).flatten()
+        v_diag[np.isinf(v_diag)] = 0
+        self.V = diags(v_diag)
+        self.V_inv = diags(v_inv)
         print("diag mtrx done")
         # calculating R_prime
-        R_prime = U_inv @ self.adj_mtx @ self.V_inv
+        R_prime = U_inv.dot(self.adj_mtx).dot(self.V_inv)
         self.P = R_prime.T @ R_prime
         print("R_prime done")
+        R_prime = csc_matrix(R_prime)
+        print("R_prime csc done")
         # calculating U_prime (top_k singular vectors)
-        R_prime = R_prime.tocsc()
         # _, _, self.Ut = linalg.svds(R_prime, k=self.top_k)
         _, _, self.Ut = sparsesvd(R_prime, self.top_k)
         self.Ut = csc_matrix(self.Ut)
@@ -186,23 +189,23 @@ class BSPM:
     def train(self, batch_test):
 
         self.results_batch = {user: [] for user in batch_test}
-
+        print("data loaded")
         R = torch.Tensor(np.array(self.adj_mtx[batch_test].todense()))
-
         blurred_out = odeint(self.blur_function, R,
                              torch.linspace(0, 1, 2).float(),
                              method="euler")
-
+        print("blurred")
         idl_out = odeint(self.idl_function, R,
                          torch.linspace(0, 1, 2).float(),
                          method="euler")
-
+        print("idl")
         sharp_out = odeint(
             self.sharp_function, blurred_out[-1] + self.idl*idl_out[-1],
             torch.linspace(0, 2.5, 2).float(), method="rk4")
-
+        print("sharp")
         for i, user in enumerate(batch_test):
             self.results_batch[user] = sharp_out[-1][i].numpy().argsort()[::-1]
+        print("done")
 
     def predict(self, user, k=20):
         return self.results_batch[user][:k]
