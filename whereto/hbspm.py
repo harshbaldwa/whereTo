@@ -10,7 +10,7 @@ from sparsesvd import sparsesvd
 from sklearn.decomposition import TruncatedSVD
 from torchdiffeq import odeint
 
-from .load_data import load_data, load_data_train_test
+from .load_data import load_data
 
 
 warnings.filterwarnings("ignore", message="divide by zero encountered in power")
@@ -83,10 +83,6 @@ class BSPM:
             with open(filename2, "wb") as f:
                 pickle.dump(self.test_data, f)
             print("Created train data split")
-
-        # self.train_data, self.test_data, self.ground_truth, self.n_usr, self.n_loc = load_data_train_test()
-        # self.n_usr += 1
-        # self.n_loc += 1
 
         filename = f"data/{self.dataset_pre}/adj_matrix_{train_p}.npz"
         try:
