@@ -1,57 +1,17 @@
 import time
-import numpy as np
 
-from whereto.bspm import BSPM
-from whereto.metrics import recall_at_k
+import numpy as np
+import torch
+from torchdiffeq import odeint
+from whereto.hbspm import BSPM
 
 s = time.time()
 dataset = "gowalla-small"
-bspm = BSPM(dataset, top_k=200)
-bspm.load_adj_matrix()
-# rng = np.random.default_rng(42)
-# batch_test = sorted(rng.choice(bspm.n_users, size=20, replace=False))
-batch_test = np.arange(20)
-bspm.train(batch_test)
-e = time.time()
-print(f"Time: {e-s}")
-recall = recall_at_k(bspm, batch_test, 20)
-print(f"Recall: {recall}")
+bspm = BSPM(dataset, k=448, idl=0.2, train_size=0.7, train_seed=42, min_checkins=5, max_checkins=30, topk=20)
 
-# print("Loaded data")
+np.random.seed(42)
+batch_test = np.random.randint(0, bspm.n_usr, 200)
 
-# wsu = 20
-# uss = 1
-# R = torch.Tensor(np.array(bspm.adj_mtx[wsu:wsu+uss].todense()))
-
-# blurred_out = odeint(
-#     bspm.blur_function, R,
-#     torch.linspace(0, 1, 2).float(), method="euler")
-
-# print("Blurred")
-
-# idl_out = odeint(
-#     bspm.idl_function, R,
-#     torch.linspace(0, 1, 2).float(), method="euler")
-
-# print("IDL")
-
-# sharp_out = odeint(
-#     bspm.sharp_function, blurred_out[-1] + bspm.idl*idl_out[-1],
-#     torch.linspace(0, 2.5, 2).float(), method="rk4")
-
-# print("Sharpened")
-# e = time.time()
-# print(f"Time: {e-s}")
-
-# for i in range(uss):
-#     algo_results = sharp_out[-1][i].numpy().argsort()[-20:][::-1]
-#     actual_results = bspm.lst[wsu+i]
-#     train_set = bspm.train_lst[wsu+i]
-
-#     new_generated = np.setdiff1d(algo_results, train_set)
-#     test = np.setdiff1d(actual_results, train_set)
-
-#     intersection = np.intersect1d(new_generated, test)
-#     if len(intersection) > 0:
-#         print(f"User: {i+wsu}")
-#         print(f"Intersection: {intersection}")
+bspm.do_thing(batch_test, tb=2.5, ti=2.5, idl=0.5)
+bspm.calc_recall(batch_test)
+bspm.pprint_results()

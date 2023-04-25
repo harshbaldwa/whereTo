@@ -4,7 +4,8 @@ from whereto.filters import filter_by_checkins, group_checkins
 
 def test_filter_by_checkins():
     df_checkins, _ = load_data("test")
-    df_checkins = filter_by_checkins(df_checkins, min_checkins=2, max_checkins=3)
+    df_checkins = filter_by_checkins(
+        df_checkins, min_checkins=2, max_checkins=3)
     assert df_checkins.shape == (4, 3)
     assert df_checkins.iloc[0].user_id == 1
     assert df_checkins.iloc[0].location_id == 0
@@ -22,7 +23,8 @@ def test_filter_by_checkins():
 
 def test_group_checkins():
     df_checkins, _ = load_data("test")
-    df_checkins = filter_by_checkins(df_checkins, min_checkins=2, max_checkins=3)
+    df_checkins = filter_by_checkins(
+        df_checkins, min_checkins=2, max_checkins=3)
     df_checkins = group_checkins(df_checkins)
     assert df_checkins.shape == (2, 4)
     assert df_checkins.iloc[0].user_id == 1
