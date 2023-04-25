@@ -1,6 +1,7 @@
 import pickle
 import time
 import warnings
+import os
 
 import numpy as np
 import torch
@@ -23,6 +24,8 @@ class BSPM:
     ):
         self.dataset = dataset
         self.dataset_pre = dataset + "/_pre"
+        if not os.path.exists(f"data/{self.dataset_pre}"):
+            os.makedirs(f"data/{self.dataset_pre}")
         self.k = k
         self.idl = idl
         self.train_size = train_size

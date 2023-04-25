@@ -133,4 +133,4 @@ dmypy.json
 .vscode/
 
 # dataset
-data/
+_pre/

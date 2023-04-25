@@ -6,7 +6,7 @@ from torchdiffeq import odeint
 from whereto.hbspm import BSPM
 
 s = time.time()
-dataset = "gowalla-small"
+dataset = "gowalla"
 bspm = BSPM(dataset, k=448, idl=0.2, train_size=0.7, train_seed=42, min_checkins=5, max_checkins=30, topk=20)
 
 np.random.seed(42)
