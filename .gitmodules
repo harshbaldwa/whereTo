@@ -1,0 +1,3 @@
+[submodule "STTR"]
+	path = STTR
+	url = https://github.com/pankhuri-s30/STTR
