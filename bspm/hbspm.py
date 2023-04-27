@@ -259,9 +259,7 @@ class BSPM:
                 self.topk, len(self.test_data[user]))
             real_counts += 1
 
-        print("Recall: ", recall / real_counts)
         self.results = recall / real_counts
-        return recall / real_counts
 
     def pprint_results(self):
         print(f"Recall@{self.topk}: {self.results}")
@@ -273,5 +271,5 @@ class BSPM:
     def save_results(self):
         if not os.path.exists("results/"):
             os.makedirs("results/")
-        with open(f"results/{self.dataset}.txt", "a") as f:
+        with open(f"results/{self.dataset}_bspm.txt", "a") as f:
             f.write(self.stats())
