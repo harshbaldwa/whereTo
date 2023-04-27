@@ -27,14 +27,7 @@ That's it! Now you have installed the required libraries and good to go ahead wi
 
 ### Method 2 - STTR: 
 
-For method 2 execution, you can directly open the `main.ipynb` in any python notebook supporting IDE like VSCode or Google Colab to run the code and get the results. Kindly change the `dname` according to which dataset you plan to choose amongst Gowalla, Foursquare and NYC.
-
-If using Google Colab, add the below code to the first cell of `main.ipynb`:
-```
-from google.colab import drive
-drive.mount('/content/drive')
-%cd /content/drive/MyDrive/Project10_S23/method_2
-```
+For method 2 execution, you can directly open the `sttr.py` in any python supporting IDE to run the code and get the results or run it directly from the terminal. Kindly change the `dname` according to which dataset you plan to choose amongst Gowalla, Foursquare and NYC.
 
 The file follows the below sequence:
 
@@ -44,4 +37,4 @@ The file follows the below sequence:
 
 3. Executes `train.py` file to train the model and save the results. Using main.ipynb file here provides the advantage of tuning the hyperparameters easily without having to make changes within different code sections of `train.py` file
 
-The results are saved in `<dname>_results.txt` file
+The results are saved in `<dname>_sttr_.txt` file
