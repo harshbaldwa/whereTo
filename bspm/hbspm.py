@@ -5,15 +5,15 @@ import os
 
 import numpy as np
 import torch
-from scipy.sparse import csr_matrix, diags, load_npz, save_npz, linalg
-from sparsesvd import sparsesvd
+from scipy.sparse import csr_matrix, diags, load_npz, save_npz
 from sklearn.decomposition import TruncatedSVD
 from torchdiffeq import odeint
 
 from .load_data import load_data
 
 
-warnings.filterwarnings("ignore", message="divide by zero encountered in power")
+warnings.filterwarnings(
+    "ignore", message="divide by zero encountered in power")
 
 
 class BSPM:
@@ -94,8 +94,6 @@ class BSPM:
             print("Created adj matrix")
 
         self.adj_matrix = adj_matrix.tolil()
-        # self.print_train_test()
-        # exit()
         self.calc_factors()
 
         filename = f"data/{self.dataset_pre}/svd_{self.k}.npy"
@@ -103,7 +101,10 @@ class BSPM:
             self.vt = np.load(filename)
             print("Loaded SVD from file")
         except FileNotFoundError:
+            start = time.time()
             self.do_svd()
+            end = time.time()
+            print(f"SVD {self.k} time:", end - start)
             np.save(filename, self.vt)
             print("Created SVD")
 
@@ -136,7 +137,6 @@ class BSPM:
         # populate adjacency list
         for _, row in df_checkins.iterrows():
             adj_list[row["user_id"]].append(
-                # (row["location_id"], row["frequency"], row["last_visited"])
                 row["location_id"]
             )
 
@@ -202,8 +202,6 @@ class BSPM:
         self.processed = r_prime.T @ r_prime
 
     def do_svd(self):
-        # _, ss, self.vt = linalg.svds(self.r_prime, self.k, return_singular_vectors="vh")
-        # ut, s, self.vt = sparsesvd(self.r_prime, self.k)
         svd = TruncatedSVD(n_components=self.k, n_iter=5, random_state=42)
         svd.fit(self.r_prime)
         self.vt = svd.components_
@@ -222,14 +220,17 @@ class BSPM:
         out = -r.numpy() @ self.processed
         return torch.Tensor(out)
 
-    def do_thing(self, batch_test, tb=1, kb=2, ti=1, ki=2, ts=2.5, ks=2, idl=None):
+    def do_thing(self, batch_test, tb=1, kb=2,
+                 ti=1, ki=2, ts=2.5, ks=2, idl=None):
         if idl is not None:
             self.idl = idl
         R = torch.Tensor(np.array(self.adj_matrix[batch_test].todense()))
-        blurred_out = odeint(self.blur_function, R, torch.linspace(0, tb, kb).float(), method="euler")
-        # print("Blurred")
-        idl_out = odeint(self.idl_function, R, torch.linspace(0, ti, ki).float(), method="euler")
-        # print("IDL")
+        blurred_out = odeint(
+            self.blur_function, R,
+            torch.linspace(0, tb, kb).float(), method="euler")
+        idl_out = odeint(
+            self.idl_function, R,
+            torch.linspace(0, ti, ki).float(), method="euler")
         sharp_out = odeint(
             self.sharp_function, blurred_out[-1] + self.idl*idl_out[-1],
             torch.linspace(0, ts, ks).float(), method="rk4")
@@ -244,27 +245,33 @@ class BSPM:
             if len(self.test_data[user]) == 0:
                 continue
             # get top k predictions
-            top_k = self.sharp_out[i].numpy().argsort()[-self.topk:][::-1]
-
-            # get true locations
-            true_locs = self.test_data[user]
+            total_len = len(self.test_data[user]) + len(self.train_data[user])
+            top_k = self.sharp_out[i].numpy().argsort()[-total_len:][::-1]
+            # remove all train locations
+            top_k = np.array(
+                [loc for loc in top_k if loc not in self.train_data[user]]
+            )
+            # cut to top k
+            top_k = top_k[: self.topk]
 
             # calculate recall
-            recall += len(set(top_k) & set(true_locs)) / len(true_locs)
+            recall += len(set(top_k) & set(self.test_data[user])) / min(
+                self.topk, len(self.test_data[user]))
             real_counts += 1
 
+        print("Recall: ", recall / real_counts)
         self.results = recall / real_counts
+        return recall / real_counts
 
     def pprint_results(self):
         print(f"Recall@{self.topk}: {self.results}")
 
-    def print_train_test(self):
-        print("Train:")
-        with open(f"data/{self.dataset_pre}/train.txt", "w") as f:
-            for user in self.train_data:
-                f.write(f"{user} {' '.join([str(loc) for loc in self.train_data[user]])}\n")
+    def stats(self):
+        return f"{self.n_usr}, {self.n_loc}, {self.k}, {self.topk}, \
+            {self.idl}, {self.results}\n"
 
-        print("Test:")
-        with open(f"data/{self.dataset_pre}/test.txt", "w") as f:
-            for user in self.test_data:
-                f.write(f"{user} {' '.join([str(loc) for loc in self.test_data[user]])}\n")
+    def save_results(self):
+        if not os.path.exists("results/"):
+            os.makedirs("results/")
+        with open(f"results/{self.dataset}.txt", "a") as f:
+            f.write(self.stats())

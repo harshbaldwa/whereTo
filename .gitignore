@@ -135,3 +135,4 @@ dmypy.json
 # dataset
 _pre/
 data/
+results/
