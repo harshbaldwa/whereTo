@@ -37,4 +37,4 @@ The file follows the below sequence:
 
 3. Executes `train.py` file to train the model and save the results. Using main.ipynb file here provides the advantage of tuning the hyperparameters easily without having to make changes within different code sections of `train.py` file
 
-The results are saved in `<dname>_sttr_.txt` file
+The results are saved in `<dname>_sttr.txt` file
