@@ -44,9 +44,9 @@ if __name__ == "__main__":
     start = time.time()
     # "train" the model
     bspm.do_thing(batch_test, tb=2.0, ti=2.0, idl=args.idl)
-    end = time.time()
-    print(f"Time taken for training: {end - start}")
     # calculate the recall@k
     bspm.calc_recall(batch_test)
     # save the results in "results/" folder
     bspm.save_results()
+    end = time.time()
+    print(f"Time taken for generating results: {end - start}")
