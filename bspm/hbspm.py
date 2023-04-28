@@ -23,7 +23,10 @@ class BSPM:
         max_checkins: int = 25, topk: int = 20
     ):
         self.dataset = dataset
-        self.dataset_pre = dataset + "/_pre"
+        if self.dataset == "foursquare":
+            self.dataset = "foursquare-bspm"
+        print("Dataset:", self.dataset)
+        self.dataset_pre = self.dataset + "/_pre"
         if not os.path.exists(f"data/{self.dataset_pre}"):
             os.makedirs(f"data/{self.dataset_pre}")
         self.k = k

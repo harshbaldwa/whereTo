@@ -10,9 +10,9 @@ def load_data(dataset, min_checkins=5, max_checkins=50):
                 "data/gowalla/checkins.txt", sep=",")
             df_checkins.columns = [
                 "user_id", "location_id", "checkin_time"]
-        elif dataset == "foursquare":
+        elif dataset == "foursquare-bspm":
             df_checkins = pd.read_csv(
-                "data/foursquare/checkins.txt", sep="\t", header=None)
+                "data/foursquare-bspm/checkins.txt", sep="\t", header=None)
             df_checkins.columns = [
                 "user_id", "location_id", "utc_time", "time_zone"]
             # remap "utc_time" to "checkin_time"

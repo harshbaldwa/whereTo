@@ -1,28 +1,35 @@
+import argparse
+import time
+
+import torch.utils.data as data
+from STTR.load import *
+from STTR.models import *
 from STTR.preprocess import *
 from STTR.train import *
-from STTR.load import *
-import time
 from torch import optim
-import torch.utils.data as data
 from tqdm import tqdm
-from STTR.models import *
 
 # Update to change the dataset
 dname = 'Foursquare'
 
-# Generate the cleaned npy files from the raw data
-preprocess(dname)
+parser = argparse.ArgumentParser()
+parser.add_argument('--preprocess', type=bool, default=False, help='Preprocess the data')
+args = parser.parse_args()
 
-# Generate the initial embeddings as pickle file from above npy files
-create_pickle(dname)
+if args.preprocess:
+    # Generate the cleaned npy files from the raw data
+    preprocess(dname)
+
+    # Generate the initial embeddings as pickle file from above npy files
+    create_pickle(dname)
 
 # Train the model with the hyper-parameters
-part = 100
-emb_dim = 512
+part = 10
+emb_dim = 256
 dropout = 0
 num_neg = 10
 lr = 3e-3
-epochs = 100
+epochs = 2
 
 file = open('./data/sttr_files/' + dname + '_data.pkl', 'rb') 
 file_data = joblib.load(file)
@@ -39,6 +46,6 @@ for param in stan.parameters():
 
 records = {'epoch': [], 'recall_valid': [], 'recall_test': [], 'ndcg_valid': [], 'ndcg_test': []}
 start = time.time()
-
+load = False
 trainer = Trainer(stan, records, load, trajs, mat1, mat2t, labels, lens, mat2s, num_neg, lr, epochs)
 trainer.train(part, start, dname, emb_dim)
