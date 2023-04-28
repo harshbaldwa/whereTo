@@ -18,11 +18,11 @@ k = 200
 # create the BSPM object
 bspm = BSPM(
     dataset, k=k, idl=idl, train_size=0.7, train_seed=42,
-    min_checkins=5, max_checkins=30, topk=recall)
+    min_checkins=5, max_checkins=25, topk=recall)
 
 # create a batch of 200 random users for testing
 np.random.seed(45)
-batch_test = np.random.randint(low=0, high=bspm.n_usr, dtype=np.int32)
+batch_test = np.random.randint(low=0, high=bspm.n_usr, size=200)
 
 start = time.time()
 # "train" the model

@@ -136,3 +136,7 @@ dmypy.json
 _pre/
 data/
 results/
+
+# MacOS files
+.DS_Store
+__MACOSX/

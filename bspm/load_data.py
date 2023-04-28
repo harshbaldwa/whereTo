@@ -5,15 +5,9 @@ from .filters import filter_by_checkins, group_checkins
 
 def load_data(dataset, min_checkins=5, max_checkins=50):
     try:
-        if dataset == "gowalla-small":
+        if dataset == "gowalla":
             df_checkins = pd.read_csv(
-                "data/gowalla-small/checkins.txt", sep="\t", header=None)
-            df_checkins.columns = [
-                "user_id", "checkin_time",
-                "latitude", "longitude", "location_id"]
-        elif dataset == "gowalla":
-            df_checkins = pd.read_csv(
-                "data/gowalla/gowalla_checkins.txt", sep=",")
+                "data/gowalla/checkins.txt", sep=",")
             df_checkins.columns = [
                 "user_id", "location_id", "checkin_time"]
         elif dataset == "foursquare":
